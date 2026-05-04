@@ -739,15 +739,23 @@
       const normPub = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
       const seen = new Set();
+      const debugLog = [`API: ${ranked.length} items`];
       // First pass: Korean publishers, dedupe by ISBN
       for (const item of ranked) {
         const v = item.volumeInfo;
-        if (!isKoreanText(v.publisher)) continue;
+        if (!isKoreanText(v.publisher)) {
+          debugLog.push(`SKIP not-kr: ${v.publisher}`);
+          continue;
+        }
         const isbn = getIsbn(item);
         const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          debugLog.push(`SKIP dup: ${v.publisher} ${v.pageCount}p key=${key}`);
+          continue;
+        }
         seen.add(key);
         currentResults.push(item);
+        debugLog.push(`ADD: ${v.publisher} ${v.pageCount}p key=${key}`);
         if (currentResults.length >= 3) break;
       }
       // Fallback: if nothing Korean found, take any
@@ -762,6 +770,13 @@
           if (currentResults.length >= 3) break;
         }
       }
+
+      // DEBUG: show on page
+      console.log('[DEBUG]', debugLog);
+      const dbg = document.createElement('pre');
+      dbg.style.cssText = 'background:#222;color:#0f0;padding:8px;font-size:11px;margin-top:8px;border-radius:6px;white-space:pre-wrap;';
+      dbg.textContent = '[DEBUG]\n' + debugLog.join('\n') + `\nfinal currentResults.length=${currentResults.length}`;
+      document.getElementById('resultChips').parentElement.appendChild(dbg);
 
       applyResult(0);
     } catch (e) {
