@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grow Book Log</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+/>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #141414;
+    --border: #262626;
+    --text: #ffffff;
+    --muted: #8c8c8c;
+    --accent: #39FF14;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 {
+    font-weight: 900;
+    font-size: 30px;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+  }
+  header p {
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .form-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .field input[type="text"],
+  .field input[type="number"],
+  .field input[type="date"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    transition: border-color 0.15s;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+  }
+  .seg.three { grid-template-columns: 1fr 1fr 1fr; }
+  .seg label {
+    margin: 0;
+    text-align: center;
+    padding: 8px 0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg input { display: none; }
+  .seg input:checked + span {
+    background: var(--accent);
+    color: white;
+    display: block;
+    border-radius: 6px;
+    padding: 8px 0;
+    margin: -8px 0;
+  }
+  .seg label:has(input:checked) {
+    background: var(--accent);
+    color: white;
+  }
+  .preview { text-align: center; position: sticky; top: 16px; }
+  canvas {
+    width: 100%;
+    max-width: 393px;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+    display: block;
+    margin: 0 auto;
+  }
+  .preview.transparent canvas {
+    background-image:
+      linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  }
+  .download {
+    margin-top: 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    width: 100%;
+    max-width: 393px;
+    transition: filter 0.15s, transform 0.05s;
+  }
+  .download:hover { filter: brightness(1.1); }
+  .download:active { transform: scale(0.99); }
+  footer {
+    margin-top: 64px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>GROW BOOK LOG</h1>
+    <p>오늘의 독서를 한 장의 카드로</p>
+  </header>
+
+  <div class="layout">
+    <form class="form-card" id="form" autocomplete="off">
+      <div class="field">
+        <label>레이아웃</label>
+        <div class="seg">
+          <label>
+            <input type="radio" name="layout" value="horizontal" checked />
+            가로형
+          </label>
+          <label>
+            <input type="radio" name="layout" value="vertical" />
+            세로형 (심플)
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label>배경</label>
+        <div class="seg">
+          <label>
+            <input type="radio" name="bg" value="transparent" checked />
+            투명
+          </label>
+          <label>
+            <input type="radio" name="bg" value="dark" />
+            검정
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="title">책 제목</label>
+        <input type="text" id="title" value="사피엔스" required />
+      </div>
+      <div class="field">
+        <label for="author">저자</label>
+        <input type="text" id="author" value="유발 하라리" />
+      </div>
+      <div class="field">
+        <label for="total">총 페이지 수</label>
+        <input type="number" id="total" value="512" min="1" required />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="todayStart">오늘 시작 페이지</label>
+          <input type="number" id="todayStart" value="142" min="1" required />
+        </div>
+        <div class="field">
+          <label for="todayEnd">오늘 끝 페이지</label>
+          <input type="number" id="todayEnd" value="178" min="1" required />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="time">읽은 시간 (분)</label>
+          <input type="number" id="time" value="42" min="0" required />
+        </div>
+        <div class="field">
+          <label for="date">날짜</label>
+          <input type="date" id="date" required />
+        </div>
+      </div>
+    </form>
+
+    <div class="preview">
+      <canvas id="canvas" aria-label="book log card preview"></canvas>
+      <button type="button" class="download" id="download">PNG 다운로드</button>
+    </div>
+  </div>
+
+  <footer>client-side rendering · no data leaves your browser</footer>
+</div>
+
+<script>
+  const LAYOUTS = {
+    horizontal: { W: 786, H: 1140 },
+    vertical: { W: 786, H: 1398 },
+  };
+
+  const COLOR = {
+    BG: '#101010',
+    FG: '#ffffff',
+    DIM: '#8c8c8c',
+    DIMMER: '#3c3c3c',
+    VERY_DIM: '#262626',
+    ACCENT: '#39FF14',
+  };
+
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function getLayoutKey() {
+    const el = document.querySelector('input[name="layout"]:checked');
+    return el ? el.value : 'horizontal';
+  }
+
+  function getBgMode() {
+    const el = document.querySelector('input[name="bg"]:checked');
+    return el ? el.value : 'transparent';
+  }
+
+  function fillBackground(W, H) {
+    if (getBgMode() === 'dark') {
+      ctx.fillStyle = COLOR.BG;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.clearRect(0, 0, W, H);
+    }
+  }
+
+  function drawText(text, x, y) {
+    ctx.fillText(text, x, y);
+  }
+
+  function spiralGhostColors() {
+    // Semi-transparent white for transparent mode (visible on photos)
+    if (getBgMode() === 'transparent') {
+      return { full: 'rgba(255,255,255,0.18)', before: 'rgba(255,255,255,0.30)' };
+    }
+    return { full: COLOR.VERY_DIM, before: COLOR.DIMMER };
+  }
+
+  function setupCanvas() {
+    const { W, H } = LAYOUTS[getLayoutKey()];
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    return { W, H };
+  }
+
+  function setFont(weight, size) {
+    ctx.font = `${weight} ${size}px Pretendard, -apple-system, sans-serif`;
+  }
+
+  function squareSpiralPoint(t, cx, cy, rMin, rMax, turns) {
+    const theta = t * turns * 2 * Math.PI - Math.PI / 2;
+    const r = rMin + (rMax - rMin) * t;
+    const cosv = Math.cos(theta), sinv = Math.sin(theta);
+    const m = Math.max(Math.abs(cosv), Math.abs(sinv));
+    if (m === 0) return [cx, cy];
+    return [cx + (r * cosv) / m, cy + (r * sinv) / m];
+  }
+
+  function drawSpiralSegment(cx, cy, rMin, rMax, turns, fStart, fEnd, color, lineWidth, n) {
+    if (fEnd <= fStart) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    const nStart = Math.floor(n * fStart);
+    const nEnd = Math.floor(n * fEnd);
+    const [px, py] = squareSpiralPoint(fStart, cx, cy, rMin, rMax, turns);
+    ctx.moveTo(px, py);
+    for (let i = nStart + 1; i <= nEnd; i++) {
+      const [x, y] = squareSpiralPoint(i / n, cx, cy, rMin, rMax, turns);
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawSquareSpiral({ cx, cy, rMax, rMin, beforeEnd, todayEnd, total, color, todayWidth = 8 }) {
+    const turns = 4;
+    const n = 3000;
+    const f1 = Math.max(0, Math.min(1, beforeEnd / total));
+    const f2 = Math.max(0, Math.min(1, todayEnd / total));
+    const ghost = spiralGhostColors();
+
+    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, 1, ghost.full, 2, n);
+    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, f1, ghost.before, 3, n);
+    drawSpiralSegment(cx, cy, rMin, rMax, turns, f1, f2, color, todayWidth, n);
+
+    const [ex, ey] = squareSpiralPoint(f2, cx, cy, rMin, rMax, turns);
+    const dotR = todayWidth + 4;
+    const ringR = dotR + 10;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(ex, ey, dotR, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(ex, ey, ringR, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
+
+  function drawBrandMark(cx, cy, scale = 1) {
+    setFont(900, 32 * scale);
+    ctx.fillStyle = COLOR.ACCENT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GROW', cx, cy);
+  }
+
+  function readForm() {
+    const title = (document.getElementById('title').value || '제목없음').trim();
+    const author = (document.getElementById('author').value || '').trim();
+    const total = Math.max(1, parseInt(document.getElementById('total').value, 10) || 1);
+    const todayStart = Math.max(1, Math.min(total, parseInt(document.getElementById('todayStart').value, 10) || 1));
+    let todayEnd = parseInt(document.getElementById('todayEnd').value, 10) || todayStart;
+    todayEnd = Math.max(todayStart, Math.min(total, todayEnd));
+    const time = Math.max(0, parseInt(document.getElementById('time').value, 10) || 0);
+    const dateStr = document.getElementById('date').value;
+    const date = dateStr ? dateStr.replace(/-/g, '.') : '';
+    return { title, author, total, todayStart, todayEnd, time, date };
+  }
+
+  function renderHorizontal(W, H, data) {
+    const { title, author, total, todayStart, todayEnd, time, date } = data;
+    const pages = todayEnd - todayStart + 1;
+    const progress = ((todayEnd / total) * 100).toFixed(1) + '%';
+    const beforeEnd = todayStart - 1;
+
+    fillBackground(W, H);
+
+    ctx.fillStyle = COLOR.FG;
+    setFont(900, 36);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title, W / 2, 100);
+
+    const metaText = author && date ? `${author} · ${date}` : (author || date || '');
+    if (metaText) {
+      setFont(700, 22);
+      ctx.fillText(metaText, W / 2, 148);
+    }
+
+    const stats = [
+      ['Pages', String(pages)],
+      ['Time', `${time}m`],
+      ['Progress', progress],
+    ];
+    const cellW = W / 3;
+
+    setFont(700, 24);
+    stats.forEach(([label], i) => {
+      ctx.fillText(label, cellW * i + cellW / 2, 230);
+    });
+
+    setFont(900, 64);
+    stats.forEach(([, value], i) => {
+      ctx.fillText(value, cellW * i + cellW / 2, 308);
+    });
+
+    drawSquareSpiral({
+      cx: W / 2, cy: 720,
+      rMax: 240, rMin: 22,
+      beforeEnd, todayEnd, total,
+      color: COLOR.ACCENT,
+      todayWidth: 8,
+    });
+
+    drawBrandMark(W / 2, 1075, 1);
+  }
+
+  function renderVertical(W, H, data) {
+    const { title, author, total, todayStart, todayEnd, time, date } = data;
+    const pages = todayEnd - todayStart + 1;
+    const progress = ((todayEnd / total) * 100).toFixed(1) + '%';
+    const beforeEnd = todayStart - 1;
+
+    fillBackground(W, H);
+
+    ctx.fillStyle = COLOR.FG;
+    setFont(900, 44);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title, W / 2, 120);
+
+    const metaText = author && date ? `${author} · ${date}` : (author || date || '');
+    if (metaText) {
+      setFont(700, 24);
+      ctx.fillText(metaText, W / 2, 175);
+    }
+
+    const stats = [
+      ['Pages', String(pages)],
+      ['Time', `${time}m`],
+      ['Progress', progress],
+    ];
+
+    const baseY = 280;
+    const rowGap = 192;
+    stats.forEach(([label, value], i) => {
+      const rowY = baseY + i * rowGap;
+      setFont(700, 30);
+      ctx.fillText(label, W / 2, rowY);
+      setFont(900, 104);
+      ctx.fillText(value, W / 2, rowY + 96);
+    });
+
+    drawSquareSpiral({
+      cx: W / 2, cy: 1050,
+      rMax: 160, rMin: 16,
+      beforeEnd, todayEnd, total,
+      color: COLOR.ACCENT,
+      todayWidth: 7,
+    });
+
+    drawBrandMark(W / 2, 1340, 1.1);
+  }
+
+  function render() {
+    const { W, H } = setupCanvas();
+    const data = readForm();
+    document.querySelector('.preview').classList.toggle(
+      'transparent', getBgMode() !== 'dark'
+    );
+    if (getLayoutKey() === 'vertical') {
+      renderVertical(W, H, data);
+    } else {
+      renderHorizontal(W, H, data);
+    }
+  }
+
+  function setDefaultDate() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    document.getElementById('date').value = `${y}-${m}-${d}`;
+  }
+
+  function slugify(s) {
+    return s.replace(/[\s\\/:*?"<>|]+/g, '_').slice(0, 40);
+  }
+
+  setDefaultDate();
+  document.getElementById('form').addEventListener('input', render);
+  document.getElementById('form').addEventListener('change', render);
+  document.getElementById('download').addEventListener('click', () => {
+    const { title, date } = readForm();
+    const layout = getLayoutKey();
+    canvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `growbooklog_${slugify(title)}_${date || 'today'}_${layout}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(render);
+  } else {
+    setTimeout(render, 100);
+  }
+</script>
+</body>
+</html>
