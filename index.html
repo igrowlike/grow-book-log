@@ -698,7 +698,11 @@
     return (isbn13 && isbn13.identifier) || (isbn10 && isbn10.identifier) || null;
   }
 
+  let autofillInProgress = false;
   async function autofillFromTitle() {
+    if (autofillInProgress) return;
+    autofillInProgress = true;
+
     const titleEl = document.getElementById('title');
     const statusEl = document.getElementById('autofillStatus');
     const chipsEl = document.getElementById('resultChips');
@@ -706,11 +710,11 @@
     const title = titleEl.value.trim();
 
     chipsEl.innerHTML = '';
-    currentResults = [];
 
     if (!title) {
       statusEl.textContent = '제목을 먼저 입력해주세요';
       statusEl.className = 'autofill-status error';
+      autofillInProgress = false;
       return;
     }
 
@@ -724,6 +728,7 @@
       const data = await res.json();
 
       if (!data.items || data.items.length === 0) {
+        currentResults = [];
         statusEl.textContent = '결과를 찾지 못했어요. 직접 입력해주세요.';
         statusEl.className = 'autofill-status error';
         return;
@@ -738,46 +743,32 @@
       const isKoreanText = (s) => /[가-힣]/.test(s || '');
       const normPub = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
+      // Use LOCAL array to avoid race conditions, then atomically swap into currentResults
+      const local = [];
       const seen = new Set();
-      const debugLog = [`API: ${ranked.length} items`];
-      // First pass: Korean publishers, dedupe by ISBN
       for (const item of ranked) {
         const v = item.volumeInfo;
-        if (!isKoreanText(v.publisher)) {
-          debugLog.push(`SKIP not-kr: ${v.publisher}`);
-          continue;
-        }
+        if (!isKoreanText(v.publisher)) continue;
         const isbn = getIsbn(item);
         const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
-        if (seen.has(key)) {
-          debugLog.push(`SKIP dup: ${v.publisher} ${v.pageCount}p key=${key}`);
-          continue;
-        }
+        if (seen.has(key)) continue;
         seen.add(key);
-        currentResults.push(item);
-        debugLog.push(`ADD: ${v.publisher} ${v.pageCount}p key=${key}`);
-        if (currentResults.length >= 3) break;
+        local.push(item);
+        if (local.length >= 3) break;
       }
-      // Fallback: if nothing Korean found, take any
-      if (currentResults.length === 0) {
+      if (local.length === 0) {
         for (const item of ranked) {
           const v = item.volumeInfo;
           const isbn = getIsbn(item);
           const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          currentResults.push(item);
-          if (currentResults.length >= 3) break;
+          local.push(item);
+          if (local.length >= 3) break;
         }
       }
 
-      // DEBUG: show on page
-      console.log('[DEBUG]', debugLog);
-      const dbg = document.createElement('pre');
-      dbg.style.cssText = 'background:#222;color:#0f0;padding:8px;font-size:11px;margin-top:8px;border-radius:6px;white-space:pre-wrap;';
-      dbg.textContent = '[DEBUG]\n' + debugLog.join('\n') + `\nfinal currentResults.length=${currentResults.length}`;
-      document.getElementById('resultChips').parentElement.appendChild(dbg);
-
+      currentResults = local;
       applyResult(0);
     } catch (e) {
       console.error(e);
@@ -785,6 +776,7 @@
       statusEl.className = 'autofill-status error';
     } finally {
       btn.disabled = false;
+      autofillInProgress = false;
     }
   }
 
