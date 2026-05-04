@@ -120,6 +120,30 @@
   }
   .autofill-status.success { color: var(--accent); }
   .autofill-status.error { color: #f59e0b; }
+  .result-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .result-chip {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .result-chip:hover { border-color: var(--accent); }
+  .result-chip.active {
+    border-color: var(--accent);
+    background: rgba(57, 255, 20, 0.10);
+    color: var(--accent);
+  }
   .date-row {
     display: flex;
     gap: 8px;
@@ -270,6 +294,7 @@
           <button type="button" id="autofill" class="autofill-btn">자동 채우기</button>
         </div>
         <div class="autofill-status" id="autofillStatus"></div>
+        <div class="result-chips" id="resultChips"></div>
       </div>
       <div class="field">
         <label for="author">저자</label>
@@ -618,11 +643,70 @@
     return score;
   }
 
+  let currentResults = [];
+
+  function applyResult(idx) {
+    const item = currentResults[idx];
+    if (!item) return;
+    const v = item.volumeInfo;
+
+    const author = (v.authors || []).join(', ');
+    const pageCount = v.pageCount || 0;
+
+    if (author) document.getElementById('author').value = author;
+    if (pageCount > 0) document.getElementById('total').value = pageCount;
+
+    const parts = [];
+    if (author) parts.push(author);
+    if (pageCount > 0) parts.push(`${pageCount}p`);
+
+    const statusEl = document.getElementById('autofillStatus');
+    if (parts.length > 0) {
+      statusEl.textContent = `✓ ${v.title} · ${parts.join(' · ')}`;
+      statusEl.className = 'autofill-status success';
+    } else {
+      statusEl.textContent = '책은 찾았는데 정보가 부족해요. 직접 입력해주세요.';
+      statusEl.className = 'autofill-status error';
+    }
+
+    renderResultChips(idx);
+    render();
+  }
+
+  function renderResultChips(activeIdx) {
+    const container = document.getElementById('resultChips');
+    container.innerHTML = '';
+    if (currentResults.length <= 1) return;
+
+    currentResults.forEach((item, idx) => {
+      const v = item.volumeInfo;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'result-chip' + (idx === activeIdx ? ' active' : '');
+      const pub = v.publisher || '출판사 미상';
+      const pages = v.pageCount || 0;
+      chip.textContent = pages > 0 ? `${pub} · ${pages}p` : pub;
+      chip.addEventListener('click', () => applyResult(idx));
+      container.appendChild(chip);
+    });
+  }
+
+  function getIsbn(item) {
+    const ids = item.volumeInfo.industryIdentifiers || [];
+    const isbn13 = ids.find(x => x.type === 'ISBN_13');
+    const isbn10 = ids.find(x => x.type === 'ISBN_10');
+    return (isbn13 && isbn13.identifier) || (isbn10 && isbn10.identifier) || null;
+  }
+
   async function autofillFromTitle() {
     const titleEl = document.getElementById('title');
     const statusEl = document.getElementById('autofillStatus');
+    const chipsEl = document.getElementById('resultChips');
     const btn = document.getElementById('autofill');
     const title = titleEl.value.trim();
+
+    chipsEl.innerHTML = '';
+    currentResults = [];
 
     if (!title) {
       statusEl.textContent = '제목을 먼저 입력해주세요';
@@ -645,33 +729,41 @@
         return;
       }
 
-      // Score & rank
+      // Score, rank, dedupe by ISBN, top 3 Korean only
       const ranked = data.items
         .map((item) => ({ item, score: scoreBook(item, title) }))
-        .sort((a, b) => b.score - a.score);
+        .sort((a, b) => b.score - a.score)
+        .map((r) => r.item);
 
-      const best = ranked[0].item;
-      const v = best.volumeInfo;
+      const isKoreanText = (s) => /[가-힣]/.test(s || '');
+      const normPub = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
-      const author = (v.authors || []).join(', ');
-      const pageCount = v.pageCount || 0;
-
-      if (author) document.getElementById('author').value = author;
-      if (pageCount > 0) document.getElementById('total').value = pageCount;
-
-      const parts = [];
-      if (author) parts.push(author);
-      if (pageCount > 0) parts.push(`${pageCount}p`);
-
-      if (parts.length > 0) {
-        statusEl.textContent = `✓ ${v.title} · ${parts.join(' · ')}`;
-        statusEl.className = 'autofill-status success';
-      } else {
-        statusEl.textContent = '책은 찾았는데 정보가 부족해요. 직접 입력해주세요.';
-        statusEl.className = 'autofill-status error';
+      const seen = new Set();
+      // First pass: Korean publishers, dedupe by ISBN
+      for (const item of ranked) {
+        const v = item.volumeInfo;
+        if (!isKoreanText(v.publisher)) continue;
+        const isbn = getIsbn(item);
+        const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        currentResults.push(item);
+        if (currentResults.length >= 3) break;
+      }
+      // Fallback: if nothing Korean found, take any
+      if (currentResults.length === 0) {
+        for (const item of ranked) {
+          const v = item.volumeInfo;
+          const isbn = getIsbn(item);
+          const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          currentResults.push(item);
+          if (currentResults.length >= 3) break;
+        }
       }
 
-      render();
+      applyResult(0);
     } catch (e) {
       console.error(e);
       statusEl.textContent = '검색 실패. 잠시 후 다시 시도해주세요.';
