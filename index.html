@@ -120,6 +120,35 @@
   }
   .autofill-status.success { color: var(--accent); }
   .autofill-status.error { color: #f59e0b; }
+  .date-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .date-row input { flex: 1; }
+  .date-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .date-stepper button {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    width: 36px;
+    flex: 1;
+    font-size: 12px;
+    padding: 0;
+    line-height: 1;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .date-stepper button:hover {
+    border-color: var(--accent);
+    background: var(--bg);
+  }
+  .date-stepper button:active { transform: scale(0.95); }
   .seg {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -237,37 +266,43 @@
       <div class="field">
         <label for="title">책 제목</label>
         <div class="title-row">
-          <input type="text" id="title" value="사피엔스" required />
+          <input type="text" id="title" required />
           <button type="button" id="autofill" class="autofill-btn">자동 채우기</button>
         </div>
         <div class="autofill-status" id="autofillStatus"></div>
       </div>
       <div class="field">
         <label for="author">저자</label>
-        <input type="text" id="author" value="유발 하라리" />
+        <input type="text" id="author" />
       </div>
       <div class="field">
         <label for="total">총 페이지 수</label>
-        <input type="number" id="total" value="512" min="1" required />
+        <input type="number" id="total" min="1" required />
       </div>
       <div class="row">
         <div class="field">
           <label for="todayStart">오늘 시작 페이지</label>
-          <input type="number" id="todayStart" value="142" min="1" required />
+          <input type="number" id="todayStart" min="1" required />
         </div>
         <div class="field">
           <label for="todayEnd">오늘 끝 페이지</label>
-          <input type="number" id="todayEnd" value="178" min="1" required />
+          <input type="number" id="todayEnd" min="1" required />
         </div>
       </div>
       <div class="row">
         <div class="field">
           <label for="time">읽은 시간 (분)</label>
-          <input type="number" id="time" value="42" min="0" required />
+          <input type="number" id="time" min="0" required />
         </div>
         <div class="field">
           <label for="date">날짜</label>
-          <input type="date" id="date" required />
+          <div class="date-row">
+            <input type="date" id="date" required />
+            <div class="date-stepper">
+              <button type="button" id="dateUp" aria-label="다음 날">▲</button>
+              <button type="button" id="dateDown" aria-label="이전 날">▼</button>
+            </div>
+          </div>
         </div>
       </div>
     </form>
@@ -371,10 +406,13 @@
   function drawSquareSpiral({ cx, cy, rMax, rMin, todayEnd, total, color, todayWidth = 8 }) {
     const turns = 4;
     const n = 3000;
-    const f2 = Math.max(0, Math.min(1, todayEnd / total));
     const ghostColor = spiralGhostColor();
 
     drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, 1, ghostColor, 2, n);
+
+    if (total <= 0 || todayEnd <= 0) return; // no progress, just empty ghost
+
+    const f2 = Math.max(0, Math.min(1, todayEnd / total));
     drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, f2, color, todayWidth, n);
 
     const [ex, ey] = squareSpiralPoint(f2, cx, cy, rMin, rMax, turns);
@@ -400,12 +438,15 @@
   }
 
   function readForm() {
-    const title = (document.getElementById('title').value || '제목없음').trim();
+    const title = (document.getElementById('title').value || '').trim();
     const author = (document.getElementById('author').value || '').trim();
-    const total = Math.max(1, parseInt(document.getElementById('total').value, 10) || 1);
-    const todayStart = Math.max(1, Math.min(total, parseInt(document.getElementById('todayStart').value, 10) || 1));
-    let todayEnd = parseInt(document.getElementById('todayEnd').value, 10) || todayStart;
-    todayEnd = Math.max(todayStart, Math.min(total, todayEnd));
+    const total = Math.max(0, parseInt(document.getElementById('total').value, 10) || 0);
+    const todayStart = Math.max(0, parseInt(document.getElementById('todayStart').value, 10) || 0);
+    let todayEnd = parseInt(document.getElementById('todayEnd').value, 10) || 0;
+    if (todayEnd > 0 && todayStart > 0) {
+      todayEnd = Math.max(todayStart, todayEnd);
+      if (total > 0) todayEnd = Math.min(total, todayEnd);
+    }
     const time = Math.max(0, parseInt(document.getElementById('time').value, 10) || 0);
     const dateStr = document.getElementById('date').value;
     const date = dateStr ? dateStr.replace(/-/g, '.') : '';
@@ -444,39 +485,45 @@
   }
 
   function calcThirdStat(data) {
-    const pages = data.todayEnd - data.todayStart + 1;
+    const hasRange = data.todayEnd > 0 && data.todayStart > 0;
+    const pages = hasRange ? data.todayEnd - data.todayStart + 1 : 0;
     if (getStatType() === 'pace') {
-      const t = Math.max(1, data.time);
-      const pace = (pages / t).toFixed(2);
+      if (data.time === 0 || pages === 0) return ['Pace', '0.0p/m'];
+      const pace = (pages / data.time).toFixed(1);
       return ['Pace', `${pace}p/m`];
     }
-    const progress = ((data.todayEnd / data.total) * 100).toFixed(1) + '%';
-    return ['Progress', progress];
+    if (data.total === 0 || data.todayEnd === 0) return ['Progress', '0%'];
+    const progress = Math.round((data.todayEnd / data.total) * 100);
+    return ['Progress', `${progress}%`];
   }
 
   function renderCard(W, H, data) {
     const { title, author, todayStart, todayEnd, time, date } = data;
-    const pages = todayEnd - todayStart + 1;
+    const hasRange = todayEnd > 0 && todayStart > 0;
+    const pages = hasRange ? todayEnd - todayStart + 1 : 0;
 
     fillBackground(W, H);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Date as small "eyebrow" above title (clearly the reading date, not pub date)
+    // Date as small "eyebrow" above title
     if (date) {
       ctx.fillStyle = COLOR.FG;
       setFont(700, 22);
       ctx.fillText(date, W / 2, 85);
     }
 
-    // Title
-    ctx.fillStyle = COLOR.FG;
-    setFont(900, 44);
-    ctx.fillText(title, W / 2, 140);
+    // Title (only if entered)
+    if (title) {
+      ctx.fillStyle = COLOR.FG;
+      setFont(900, 44);
+      ctx.fillText(title, W / 2, 140);
+    }
 
     // Author alone (no date attached)
     if (author) {
+      ctx.fillStyle = COLOR.FG;
       setFont(700, 24);
       ctx.fillText(author, W / 2, 195);
     }
@@ -636,10 +683,26 @@
     }
   }
 
+  function shiftDate(days) {
+    const dateEl = document.getElementById('date');
+    const today = new Date();
+    const t = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const current = dateEl.value || t;
+    const d = new Date(current + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    dateEl.value = `${y}-${m}-${day}`;
+    render();
+  }
+
   setDefaultDate();
   document.getElementById('form').addEventListener('input', render);
   document.getElementById('form').addEventListener('change', render);
   document.getElementById('autofill').addEventListener('click', autofillFromTitle);
+  document.getElementById('dateUp').addEventListener('click', () => shiftDate(1));
+  document.getElementById('dateDown').addEventListener('click', () => shiftDate(-1));
   document.getElementById('title').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
