@@ -86,6 +86,34 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
+  .title-row {
+    display: flex;
+    gap: 8px;
+  }
+  .title-row input { flex: 1; }
+  .autofill-btn {
+    padding: 0 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.15s, opacity 0.15s;
+  }
+  .autofill-btn:hover { border-color: var(--accent); }
+  .autofill-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .autofill-status {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 16px;
+  }
+  .autofill-status.success { color: var(--accent); }
+  .autofill-status.error { color: #f59e0b; }
   .seg {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -201,7 +229,11 @@
       </div>
       <div class="field">
         <label for="title">책 제목</label>
-        <input type="text" id="title" value="사피엔스" required />
+        <div class="title-row">
+          <input type="text" id="title" value="사피엔스" required />
+          <button type="button" id="autofill" class="autofill-btn">자동 채우기</button>
+        </div>
+        <div class="autofill-status" id="autofillStatus"></div>
       </div>
       <div class="field">
         <label for="author">저자</label>
@@ -498,9 +530,121 @@
     return s.replace(/[\s\\/:*?"<>|]+/g, '_').slice(0, 40);
   }
 
+  const VARIANT_KEYWORDS = [
+    '코멘터리', '큰글자', '큰활자', '리커버', '양장본', '양장',
+    '합본', '세트', '오디오북', '오디오', '워크북', '필사',
+    '스페셜', '한정판', '특별판', '주석', '주해', '해설본',
+    '컬러판', '리마스터', '미리보기', '체험판', '리뉴얼',
+  ];
+
+  function scoreBook(item, query) {
+    const v = item.volumeInfo || {};
+    const titleLower = (v.title || '').toLowerCase().trim();
+    const queryLower = query.toLowerCase().trim();
+    let score = 0;
+
+    // Strong penalty: variant editions
+    for (const kw of VARIANT_KEYWORDS) {
+      if (titleLower.includes(kw)) score -= 50;
+    }
+
+    // Title match strength
+    if (titleLower === queryLower) score += 100;
+    else if (titleLower.startsWith(queryLower)) score += 30;
+    else if (titleLower.includes(queryLower)) score += 15;
+
+    // Page count signal
+    const pages = v.pageCount || 0;
+    if (pages >= 150) score += 40;
+    else if (pages >= 50) score += 15;
+    else if (pages > 0) score += 5;
+    else score -= 30;
+
+    // Metadata completeness
+    if ((v.authors || []).length > 0) score += 10;
+    if (v.publisher) score += 5;
+
+    // Romanized authors (often low-quality auto-imported entries)
+    for (const a of (v.authors || [])) {
+      if (/[ŏŭāīū]/.test(a)) { score -= 30; break; }
+    }
+
+    return score;
+  }
+
+  async function autofillFromTitle() {
+    const titleEl = document.getElementById('title');
+    const statusEl = document.getElementById('autofillStatus');
+    const btn = document.getElementById('autofill');
+    const title = titleEl.value.trim();
+
+    if (!title) {
+      statusEl.textContent = '제목을 먼저 입력해주세요';
+      statusEl.className = 'autofill-status error';
+      return;
+    }
+
+    btn.disabled = true;
+    statusEl.textContent = '검색 중...';
+    statusEl.className = 'autofill-status';
+
+    try {
+      const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=20`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!data.items || data.items.length === 0) {
+        statusEl.textContent = '결과를 찾지 못했어요. 직접 입력해주세요.';
+        statusEl.className = 'autofill-status error';
+        return;
+      }
+
+      // Score & rank
+      const ranked = data.items
+        .map((item) => ({ item, score: scoreBook(item, title) }))
+        .sort((a, b) => b.score - a.score);
+
+      const best = ranked[0].item;
+      const v = best.volumeInfo;
+
+      const author = (v.authors || []).join(', ');
+      const pageCount = v.pageCount || 0;
+
+      if (author) document.getElementById('author').value = author;
+      if (pageCount > 0) document.getElementById('total').value = pageCount;
+
+      const parts = [];
+      if (author) parts.push(author);
+      if (pageCount > 0) parts.push(`${pageCount}p`);
+
+      if (parts.length > 0) {
+        statusEl.textContent = `✓ ${v.title} · ${parts.join(' · ')}`;
+        statusEl.className = 'autofill-status success';
+      } else {
+        statusEl.textContent = '책은 찾았는데 정보가 부족해요. 직접 입력해주세요.';
+        statusEl.className = 'autofill-status error';
+      }
+
+      render();
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = '검색 실패. 잠시 후 다시 시도해주세요.';
+      statusEl.className = 'autofill-status error';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   setDefaultDate();
   document.getElementById('form').addEventListener('input', render);
   document.getElementById('form').addEventListener('change', render);
+  document.getElementById('autofill').addEventListener('click', autofillFromTitle);
+  document.getElementById('title').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      autofillFromTitle();
+    }
+  });
   document.getElementById('download').addEventListener('click', () => {
     const { title, date } = readForm();
     const layout = getLayoutKey();
