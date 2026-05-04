@@ -485,8 +485,7 @@
   }
 
   function calcThirdStat(data) {
-    const hasRange = data.todayEnd > 0 && data.todayStart > 0;
-    const pages = hasRange ? data.todayEnd - data.todayStart + 1 : 0;
+    const pages = Math.max(0, data.todayEnd - data.todayStart);
     if (getStatType() === 'pace') {
       if (data.time === 0 || pages === 0) return ['Pace', '0.0p/m'];
       const pace = (pages / data.time).toFixed(1);
@@ -499,8 +498,7 @@
 
   function renderCard(W, H, data) {
     const { title, author, todayStart, todayEnd, time, date } = data;
-    const hasRange = todayEnd > 0 && todayStart > 0;
-    const pages = hasRange ? todayEnd - todayStart + 1 : 0;
+    const pages = Math.max(0, todayEnd - todayStart);
 
     fillBackground(W, H);
 
