@@ -40,6 +40,12 @@
     color: var(--muted);
     font-size: 14px;
   }
+  header .credit {
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: 0.6;
+    letter-spacing: 0.02em;
+  }
   .layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -196,21 +202,22 @@
 <div class="container">
   <header>
     <h1>GROW BOOK LOG</h1>
-    <p>오늘의 독서를 한 장의 카드로</p>
+    <p>달리기처럼, 독서도 인증해보세요</p>
+    <p class="credit">무료 배포 · @igrow_like</p>
   </header>
 
   <div class="layout">
     <form class="form-card" id="form" autocomplete="off">
       <div class="field">
-        <label>레이아웃</label>
+        <label>지표 종류</label>
         <div class="seg">
           <label>
-            <input type="radio" name="layout" value="horizontal" checked />
-            가로형
+            <input type="radio" name="layout" value="progress" checked />
+            Progress형
           </label>
           <label>
-            <input type="radio" name="layout" value="vertical" />
-            세로형 (심플)
+            <input type="radio" name="layout" value="pace" />
+            페이스형
           </label>
         </div>
       </div>
@@ -275,10 +282,7 @@
 </div>
 
 <script>
-  const LAYOUTS = {
-    horizontal: { W: 786, H: 1140 },
-    vertical: { W: 786, H: 1398 },
-  };
+  const CANVAS = { W: 786, H: 1398 };
 
   const COLOR = {
     BG: '#101010',
@@ -292,9 +296,9 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
-  function getLayoutKey() {
+  function getStatType() {
     const el = document.querySelector('input[name="layout"]:checked');
-    return el ? el.value : 'horizontal';
+    return el ? el.value : 'progress';
   }
 
   function getBgMode() {
@@ -315,16 +319,16 @@
     ctx.fillText(text, x, y);
   }
 
-  function spiralGhostColors() {
-    // Semi-transparent white for transparent mode (visible on photos)
+  function spiralGhostColor() {
+    // Color for the "unread" part of the spiral
     if (getBgMode() === 'transparent') {
-      return { full: 'rgba(255,255,255,0.18)', before: 'rgba(255,255,255,0.30)' };
+      return 'rgba(255,255,255,0.18)';
     }
-    return { full: COLOR.VERY_DIM, before: COLOR.DIMMER };
+    return COLOR.VERY_DIM;
   }
 
   function setupCanvas() {
-    const { W, H } = LAYOUTS[getLayoutKey()];
+    const { W, H } = CANVAS;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = W * dpr;
     canvas.height = H * dpr;
@@ -364,16 +368,14 @@
     ctx.stroke();
   }
 
-  function drawSquareSpiral({ cx, cy, rMax, rMin, beforeEnd, todayEnd, total, color, todayWidth = 8 }) {
+  function drawSquareSpiral({ cx, cy, rMax, rMin, todayEnd, total, color, todayWidth = 8 }) {
     const turns = 4;
     const n = 3000;
-    const f1 = Math.max(0, Math.min(1, beforeEnd / total));
     const f2 = Math.max(0, Math.min(1, todayEnd / total));
-    const ghost = spiralGhostColors();
+    const ghostColor = spiralGhostColor();
 
-    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, 1, ghost.full, 2, n);
-    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, f1, ghost.before, 3, n);
-    drawSpiralSegment(cx, cy, rMin, rMax, turns, f1, f2, color, todayWidth, n);
+    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, 1, ghostColor, 2, n);
+    drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, f2, color, todayWidth, n);
 
     const [ex, ey] = squareSpiralPoint(f2, cx, cy, rMin, rMax, turns);
     const dotR = todayWidth + 4;
@@ -410,94 +412,97 @@
     return { title, author, total, todayStart, todayEnd, time, date };
   }
 
-  function renderHorizontal(W, H, data) {
-    const { title, author, total, todayStart, todayEnd, time, date } = data;
-    const pages = todayEnd - todayStart + 1;
-    const progress = ((todayEnd / total) * 100).toFixed(1) + '%';
-    const beforeEnd = todayStart - 1;
-
-    fillBackground(W, H);
-
-    ctx.fillStyle = COLOR.FG;
-    setFont(900, 36);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(title, W / 2, 100);
-
-    const metaText = author && date ? `${author} · ${date}` : (author || date || '');
-    if (metaText) {
-      setFont(700, 22);
-      ctx.fillText(metaText, W / 2, 148);
-    }
-
-    const stats = [
-      ['Pages', String(pages)],
-      ['Time', `${time}m`],
-      ['Progress', progress],
-    ];
-    const cellW = W / 3;
-
-    setFont(700, 24);
-    stats.forEach(([label], i) => {
-      ctx.fillText(label, cellW * i + cellW / 2, 230);
-    });
-
-    setFont(900, 64);
-    stats.forEach(([, value], i) => {
-      ctx.fillText(value, cellW * i + cellW / 2, 308);
-    });
-
-    drawSquareSpiral({
-      cx: W / 2, cy: 720,
-      rMax: 240, rMin: 22,
-      beforeEnd, todayEnd, total,
-      color: COLOR.ACCENT,
-      todayWidth: 8,
-    });
-
-    drawBrandMark(W / 2, 1075, 1);
+  function parseValue(value) {
+    const m = String(value).match(/^([\d.,]+)(.*)$/);
+    if (m) return { num: m[1], unit: m[2] };
+    return { num: value, unit: '' };
   }
 
-  function renderVertical(W, H, data) {
-    const { title, author, total, todayStart, todayEnd, time, date } = data;
+  function drawDualSizeValue(centerX, midY, num, unit, numSize, unitSize) {
+    if (!unit) {
+      setFont(900, numSize);
+      ctx.textAlign = 'center';
+      ctx.fillText(num, centerX, midY);
+      return;
+    }
+    setFont(900, numSize);
+    const numW = ctx.measureText(num).width;
+    setFont(900, unitSize);
+    const unitW = ctx.measureText(unit).width;
+    const gap = 4;
+    const totalW = numW + gap + unitW;
+    const startX = centerX - totalW / 2;
+    // Bottom-align: shift unit down so its visual bottom matches number's bottom
+    const unitMidY = midY + (numSize - unitSize) / 2;
+
+    ctx.textAlign = 'left';
+    setFont(900, numSize);
+    ctx.fillText(num, startX, midY);
+    setFont(900, unitSize);
+    ctx.fillText(unit, startX + numW + gap, unitMidY);
+    ctx.textAlign = 'center';
+  }
+
+  function calcThirdStat(data) {
+    const pages = data.todayEnd - data.todayStart + 1;
+    if (getStatType() === 'pace') {
+      const t = Math.max(1, data.time);
+      const pace = (pages / t).toFixed(2);
+      return ['Pace', `${pace}p/m`];
+    }
+    const progress = ((data.todayEnd / data.total) * 100).toFixed(1) + '%';
+    return ['Progress', progress];
+  }
+
+  function renderCard(W, H, data) {
+    const { title, author, todayStart, todayEnd, time, date } = data;
     const pages = todayEnd - todayStart + 1;
-    const progress = ((todayEnd / total) * 100).toFixed(1) + '%';
-    const beforeEnd = todayStart - 1;
 
     fillBackground(W, H);
 
-    ctx.fillStyle = COLOR.FG;
-    setFont(900, 44);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(title, W / 2, 120);
 
-    const metaText = author && date ? `${author} · ${date}` : (author || date || '');
-    if (metaText) {
+    // Date as small "eyebrow" above title (clearly the reading date, not pub date)
+    if (date) {
+      ctx.fillStyle = COLOR.FG;
+      setFont(700, 22);
+      ctx.fillText(date, W / 2, 85);
+    }
+
+    // Title
+    ctx.fillStyle = COLOR.FG;
+    setFont(900, 44);
+    ctx.fillText(title, W / 2, 140);
+
+    // Author alone (no date attached)
+    if (author) {
       setFont(700, 24);
-      ctx.fillText(metaText, W / 2, 175);
+      ctx.fillText(author, W / 2, 195);
     }
 
     const stats = [
       ['Pages', String(pages)],
       ['Time', `${time}m`],
-      ['Progress', progress],
+      calcThirdStat(data),
     ];
 
     const baseY = 280;
     const rowGap = 192;
+    const NUM_SIZE = 104;
+    const UNIT_SIZE = 73; // 70% of NUM_SIZE
     stats.forEach(([label, value], i) => {
       const rowY = baseY + i * rowGap;
       setFont(700, 30);
       ctx.fillText(label, W / 2, rowY);
-      setFont(900, 104);
-      ctx.fillText(value, W / 2, rowY + 96);
+      const { num, unit } = parseValue(value);
+      drawDualSizeValue(W / 2, rowY + 96, num, unit, NUM_SIZE, UNIT_SIZE);
     });
 
     drawSquareSpiral({
       cx: W / 2, cy: 1050,
       rMax: 160, rMin: 16,
-      beforeEnd, todayEnd, total,
+      todayEnd, total: data.total,
       color: COLOR.ACCENT,
       todayWidth: 7,
     });
@@ -511,11 +516,7 @@
     document.querySelector('.preview').classList.toggle(
       'transparent', getBgMode() !== 'dark'
     );
-    if (getLayoutKey() === 'vertical') {
-      renderVertical(W, H, data);
-    } else {
-      renderHorizontal(W, H, data);
-    }
+    renderCard(W, H, data);
   }
 
   function setDefaultDate() {
@@ -647,12 +648,12 @@
   });
   document.getElementById('download').addEventListener('click', () => {
     const { title, date } = readForm();
-    const layout = getLayoutKey();
+    const stype = getStatType();
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `growbooklog_${slugify(title)}_${date || 'today'}_${layout}.png`;
+      a.download = `growbooklog_${slugify(title)}_${date || 'today'}_${stype}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
