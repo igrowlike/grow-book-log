@@ -328,7 +328,7 @@
 <body>
 <div class="container">
   <header>
-    <h1>GROW BOOK LOG <span class="version">v.1.0</span></h1>
+    <h1>GROW BOOK LOG <span class="version">v.2.0</span></h1>
     <p>Track your reading, like a run</p>
     <p class="credit">by @igrow_like</p>
   </header>
@@ -339,17 +339,30 @@
         <div class="section-title">Style</div>
         <div class="field">
           <label>Layout</label>
-          <div class="seg three">
+          <div class="seg">
             <label>
-              <input type="radio" name="layout" value="sketch" checked />
-              Sketch
-            </label>
-            <label>
-              <input type="radio" name="layout" value="pace" />
+              <input type="radio" name="stat" value="pace" checked />
               Pace
             </label>
             <label>
-              <input type="radio" name="layout" value="stats" />
+              <input type="radio" name="stat" value="progress" />
+              Progress
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Style</label>
+          <div class="seg three">
+            <label>
+              <input type="radio" name="style" value="sketch" checked />
+              Sketch
+            </label>
+            <label>
+              <input type="radio" name="style" value="pace" />
+              Pace
+            </label>
+            <label>
+              <input type="radio" name="style" value="stats" />
               Stats
             </label>
           </div>
@@ -357,8 +370,8 @@
         <div class="field">
           <label>Color</label>
           <div class="color-picker" id="colorPicker">
-            <button type="button" class="color-swatch" data-color="#39FF14" style="background:#39FF14" aria-label="Neon Green"></button>
             <button type="button" class="color-swatch active" data-color="#FC4C02" style="background:#FC4C02" aria-label="Strava Orange"></button>
+            <button type="button" class="color-swatch" data-color="#39FF14" style="background:#39FF14" aria-label="Neon Green"></button>
             <button type="button" class="color-swatch" data-color="#2979FF" style="background:#2979FF" aria-label="Blue"></button>
           </div>
         </div>
@@ -378,28 +391,11 @@
       </div>
 
       <div class="section">
-        <div class="section-title">Book</div>
+        <div class="section-title">Today</div>
         <div class="field">
-          <label for="title">Title</label>
-          <div class="title-row">
-            <input type="text" id="title" required />
-            <button type="button" id="autofill" class="autofill-btn">Auto-fill</button>
-          </div>
-          <div class="autofill-status" id="autofillStatus"></div>
-          <div class="result-chips" id="resultChips"></div>
-        </div>
-        <div class="field">
-          <label for="author">Author</label>
-          <input type="text" id="author" />
-        </div>
-        <div class="field" style="margin-bottom: 0;">
           <label for="total">Total Pages</label>
           <input type="number" id="total" min="1" required />
         </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Today</div>
         <div class="row">
           <div class="field">
             <label for="todayStart">From Page</label>
@@ -441,8 +437,13 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
-  function getStatType() {
-    const el = document.querySelector('input[name="layout"]:checked');
+  function getStat() {
+    const el = document.querySelector('input[name="stat"]:checked');
+    return el ? el.value : 'pace';
+  }
+
+  function getStyle() {
+    const el = document.querySelector('input[name="style"]:checked');
     return el ? el.value : 'sketch';
   }
 
@@ -476,24 +477,36 @@
   sketchImg.src = 'book-sketch.png';
   sketchImg.onload = () => render();
 
-  function drawSketchBook(cx, cy, color) {
+  function drawSketchBook(cx, cy, color, fraction = 1) {
     if (!sketchImg.complete || !sketchImg.naturalWidth) return;
     const targetW = 480;
     const targetH = (sketchImg.naturalHeight / sketchImg.naturalWidth) * targetW;
-    // Tint via offscreen canvas using source-in composite
     const off = document.createElement('canvas');
     off.width = Math.round(targetW);
     off.height = Math.round(targetH);
     const octx = off.getContext('2d');
+
+    // 1. Draw the sketch (line art with original alpha preserved)
     octx.drawImage(sketchImg, 0, 0, targetW, targetH);
+
+    // 2. source-in with FULL accent color (preserves original alpha, no fade)
     octx.globalCompositeOperation = 'source-in';
     octx.fillStyle = color;
     octx.fillRect(0, 0, targetW, targetH);
+
+    // 3. For Progress mode (fraction < 1), fade RIGHT (unread) portion
+    //    by overlaying semi-transparent white → looks like lighter accent
+    if (fraction < 1) {
+      octx.globalCompositeOperation = 'source-atop';
+      octx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      const fillW = targetW * Math.max(0, Math.min(1, fraction));
+      octx.fillRect(fillW, 0, targetW - fillW, targetH);
+    }
+
     ctx.drawImage(off, cx - targetW / 2, cy - targetH / 2);
   }
 
-  function drawBookIcon(cx, cy, color, lineWidth = 6) {
-    // Open book outline: two pages with peaked tops, slight bottom curve, center spine.
+  function drawBookIcon(cx, cy, color, lineWidth = 6, fraction = 0) {
     const bw = 360, bh = 240;
     const xL = cx - bw / 2, xR = cx + bw / 2;
     const yT = cy - bh / 2, yB = cy + bh / 2;
@@ -501,34 +514,55 @@
     const spineBotY = yB - 4;
 
     const points = [
-      [cx, spineBotY],            // spine bottom
-      [xL + 18, yB - 14],         // bottom left
-      [xL + 6, yT + 6],           // top left peak
-      [cx, spineTopY],            // spine top dip
-      [xR - 6, yT + 6],           // top right peak
-      [xR - 18, yB - 14],         // bottom right
+      [cx, spineBotY],
+      [xL + 18, yB - 14],
+      [xL + 6, yT + 6],
+      [cx, spineTopY],
+      [xR - 6, yT + 6],
+      [xR - 18, yB - 14],
     ];
 
+    function buildPolygon() {
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i][0], points[i][1]);
+      }
+      ctx.closePath();
+    }
+    function buildSpine() {
+      ctx.beginPath();
+      ctx.moveTo(cx, spineTopY);
+      ctx.lineTo(cx, spineBotY);
+    }
+
     ctx.save();
-    ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Outline
-    ctx.beginPath();
-    ctx.moveTo(points[0][0], points[0][1]);
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i][0], points[i][1]);
-    }
-    ctx.closePath();
+    // Pass 1: full outline + spine in ghost color
+    ctx.strokeStyle = spiralGhostColor();
+    buildPolygon();
+    ctx.stroke();
+    buildSpine();
     ctx.stroke();
 
-    // Spine line
-    ctx.beginPath();
-    ctx.moveTo(cx, spineTopY);
-    ctx.lineTo(cx, spineBotY);
-    ctx.stroke();
+    // Pass 2: LEFT portion (fraction) in accent color, clipped
+    if (fraction > 0) {
+      ctx.save();
+      const clipRightX = xL + bw * Math.min(1, fraction);
+      ctx.beginPath();
+      ctx.rect(xL - 30, yT - 30, (clipRightX - xL) + 30, bh + 60);
+      ctx.clip();
+
+      ctx.strokeStyle = color;
+      buildPolygon();
+      ctx.stroke();
+      buildSpine();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.restore();
   }
@@ -576,16 +610,16 @@
     ctx.stroke();
   }
 
-  function drawSquareSpiral({ cx, cy, rMax, rMin, todayEnd, total, color, todayWidth = 8 }) {
+  function drawSquareSpiral({ cx, cy, rMax, rMin, fraction, color, todayWidth = 8 }) {
     const turns = 4;
     const n = 3000;
     const ghostColor = spiralGhostColor();
 
     drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, 1, ghostColor, 2, n);
 
-    if (total <= 0 || todayEnd <= 0) return; // no progress, just empty ghost
+    if (fraction <= 0) return;
 
-    const f2 = Math.max(0, Math.min(1, todayEnd / total));
+    const f2 = Math.max(0, Math.min(1, fraction));
     drawSpiralSegment(cx, cy, rMin, rMax, turns, 0, f2, color, todayWidth, n);
 
     const [ex, ey] = squareSpiralPoint(f2, cx, cy, rMin, rMax, turns);
@@ -603,8 +637,6 @@
   }
 
   function readForm() {
-    const title = (document.getElementById('title').value || '').trim();
-    const author = (document.getElementById('author').value || '').trim();
     const total = Math.max(0, parseInt(document.getElementById('total').value, 10) || 0);
     const todayStart = Math.max(0, parseInt(document.getElementById('todayStart').value, 10) || 0);
     let todayEnd = parseInt(document.getElementById('todayEnd').value, 10) || 0;
@@ -613,7 +645,7 @@
       if (total > 0) todayEnd = Math.min(total, todayEnd);
     }
     const time = Math.max(0, parseInt(document.getElementById('time').value, 10) || 0);
-    return { title, author, total, todayStart, todayEnd, time };
+    return { total, todayStart, todayEnd, time };
   }
 
   function parseValue(value) {
@@ -649,7 +681,7 @@
 
   function calcThirdStat(data) {
     const pages = Math.max(0, data.todayEnd - data.todayStart);
-    if (getStatType() === 'pace') {
+    if (getStat() === 'pace') {
       if (data.time === 0 || pages === 0) return ['Pace', '0.0p/m'];
       const pace = (pages / data.time).toFixed(1);
       return ['Pace', `${pace}p/m`];
@@ -660,27 +692,13 @@
   }
 
   function renderCard(W, H, data) {
-    const { title, author, todayStart, todayEnd, time } = data;
+    const { todayStart, todayEnd, time } = data;
     const pages = Math.max(0, todayEnd - todayStart);
 
     fillBackground(W, H);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
-    // Title (only if entered)
-    if (title) {
-      ctx.fillStyle = COLOR.FG;
-      setFont(900, 44);
-      ctx.fillText(title, W / 2, 130);
-    }
-
-    // Author
-    if (author) {
-      ctx.fillStyle = COLOR.FG;
-      setFont(700, 24);
-      ctx.fillText(author, W / 2, 185);
-    }
 
     const stats = [
       ['Pages', String(pages)],
@@ -691,7 +709,7 @@
     // Always reset to white before stats (so they show even when title/author empty)
     ctx.fillStyle = COLOR.FG;
 
-    const baseY = 280;
+    const baseY = 200;
     const rowGap = 192;
     const NUM_SIZE = 104;
     const UNIT_SIZE = 73; // 70% of NUM_SIZE
@@ -703,19 +721,21 @@
       drawDualSizeValue(W / 2, rowY + 96, num, unit, NUM_SIZE, UNIT_SIZE);
     });
 
-    const layout = getStatType();
-    if (layout === 'pace') {
-      // Pace → simple book outline
-      drawBookIcon(W / 2, 1100, COLOR.ACCENT, 6);
-    } else if (layout === 'sketch') {
-      // Sketch → hand-drawn book illustration (tinted to accent)
-      drawSketchBook(W / 2, 1100, COLOR.ACCENT);
+    // Fill fraction: Pace mode → always 100%, Progress mode → todayEnd/total
+    const fraction = (getStat() === 'pace')
+      ? 1
+      : (data.total > 0 ? Math.min(1, todayEnd / data.total) : 0);
+
+    const style = getStyle();
+    if (style === 'pace') {
+      drawBookIcon(W / 2, 1050, COLOR.ACCENT, 6, fraction);
+    } else if (style === 'sketch') {
+      drawSketchBook(W / 2, 1050, COLOR.ACCENT, fraction);
     } else {
-      // Progress → square spiral with progress fill
       drawSquareSpiral({
-        cx: W / 2, cy: 1100,
+        cx: W / 2, cy: 1050,
         rMax: 160, rMin: 16,
-        todayEnd, total: data.total,
+        fraction,
         color: COLOR.ACCENT,
         todayWidth: 7,
       });
@@ -733,199 +753,6 @@
 
   function slugify(s) {
     return s.replace(/[\s\\/:*?"<>|]+/g, '_').slice(0, 40);
-  }
-
-  const VARIANT_KEYWORDS = [
-    '코멘터리', '큰글자', '큰활자', '리커버', '양장본', '양장',
-    '합본', '세트', '오디오북', '오디오', '워크북', '필사',
-    '스페셜', '한정판', '특별판', '주석', '주해', '해설본',
-    '컬러판', '리마스터', '미리보기', '체험판', '리뉴얼',
-  ];
-
-  function scoreBook(item, query) {
-    const v = item.volumeInfo || {};
-    const titleLower = (v.title || '').toLowerCase().trim();
-    const queryLower = query.toLowerCase().trim();
-    let score = 0;
-
-    // Strong penalty: variant editions
-    for (const kw of VARIANT_KEYWORDS) {
-      if (titleLower.includes(kw)) score -= 50;
-    }
-
-    // Title match strength
-    if (titleLower === queryLower) score += 100;
-    else if (titleLower.startsWith(queryLower)) score += 30;
-    else if (titleLower.includes(queryLower)) score += 15;
-
-    // Page count signal
-    const pages = v.pageCount || 0;
-    if (pages >= 150) score += 40;
-    else if (pages >= 50) score += 15;
-    else if (pages > 0) score += 5;
-    else score -= 30;
-
-    // Metadata completeness
-    if ((v.authors || []).length > 0) score += 10;
-    if (v.publisher) score += 5;
-
-    // Romanized authors (often low-quality auto-imported entries)
-    for (const a of (v.authors || [])) {
-      if (/[ŏŭāīū]/.test(a)) { score -= 30; break; }
-    }
-
-    return score;
-  }
-
-  let currentResults = [];
-
-  function applyResult(idx) {
-    const item = currentResults[idx];
-    if (!item) return;
-    const v = item.volumeInfo;
-
-    const author = (v.authors || []).join(', ');
-    const pageCount = v.pageCount || 0;
-
-    if (author) document.getElementById('author').value = author;
-    if (pageCount > 0) document.getElementById('total').value = pageCount;
-
-    const parts = [];
-    if (author) parts.push(author);
-    if (pageCount > 0) parts.push(`${pageCount}p`);
-
-    const statusEl = document.getElementById('autofillStatus');
-    if (parts.length > 0) {
-      statusEl.textContent = `✓ ${v.title} · ${parts.join(' · ')}`;
-      statusEl.className = 'autofill-status success';
-    } else {
-      statusEl.textContent = 'Found, but missing details. Please fill in manually.';
-      statusEl.className = 'autofill-status error';
-    }
-
-    renderResultChips(idx);
-    render();
-  }
-
-  function renderResultChips(activeIdx) {
-    const container = document.getElementById('resultChips');
-    container.innerHTML = '';
-    if (currentResults.length <= 1) return;
-
-    currentResults.forEach((item, idx) => {
-      const v = item.volumeInfo;
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'result-chip' + (idx === activeIdx ? ' active' : '');
-      const pub = v.publisher || '출판사 미상';
-      const pages = v.pageCount || 0;
-      chip.textContent = pages > 0 ? `${pub} · ${pages}p` : pub;
-      chip.addEventListener('click', () => applyResult(idx));
-      container.appendChild(chip);
-    });
-  }
-
-  const GBOOKS_KEY = 'AIzaSyDKls2NUN2wBuWV16tInDGvhVOx2t65PnU';
-
-  function getIsbn(item) {
-    const ids = item.volumeInfo.industryIdentifiers || [];
-    const isbn13 = ids.find(x => x.type === 'ISBN_13');
-    const isbn10 = ids.find(x => x.type === 'ISBN_10');
-    return (isbn13 && isbn13.identifier) || (isbn10 && isbn10.identifier) || null;
-  }
-
-  let autofillInProgress = false;
-  async function autofillFromTitle() {
-    if (autofillInProgress) return;
-    autofillInProgress = true;
-
-    const titleEl = document.getElementById('title');
-    const statusEl = document.getElementById('autofillStatus');
-    const chipsEl = document.getElementById('resultChips');
-    const btn = document.getElementById('autofill');
-    const title = titleEl.value.trim();
-
-    chipsEl.innerHTML = '';
-
-    if (!title) {
-      statusEl.textContent = 'Enter a title first';
-      statusEl.className = 'autofill-status error';
-      autofillInProgress = false;
-      return;
-    }
-
-    btn.disabled = true;
-    statusEl.textContent = 'Searching...';
-    statusEl.className = 'autofill-status';
-
-    try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=20&key=${GBOOKS_KEY}`;
-      const res = await fetch(url);
-      const data = await res.json();
-
-      // Quota exceeded (429) or auth error
-      if (data.error) {
-        currentResults = [];
-        if (data.error.code === 429 || /quota/i.test(data.error.message || '')) {
-          statusEl.textContent = 'Daily search quota reached. Please fill in manually.';
-        } else {
-          statusEl.textContent = 'Search failed. Please try again later.';
-        }
-        statusEl.className = 'autofill-status error';
-        return;
-      }
-
-      if (!data.items || data.items.length === 0) {
-        currentResults = [];
-        statusEl.textContent = 'No results found. Please fill in manually.';
-        statusEl.className = 'autofill-status error';
-        return;
-      }
-
-      // Score, rank, dedupe by ISBN, top 3 Korean only
-      const ranked = data.items
-        .map((item) => ({ item, score: scoreBook(item, title) }))
-        .sort((a, b) => b.score - a.score)
-        .map((r) => r.item);
-
-      const isKoreanText = (s) => /[가-힣]/.test(s || '');
-      const normPub = (s) => (s || '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-      // Use LOCAL array to avoid race conditions, then atomically swap into currentResults
-      const local = [];
-      const seen = new Set();
-      for (const item of ranked) {
-        const v = item.volumeInfo;
-        if (!isKoreanText(v.publisher)) continue;
-        const isbn = getIsbn(item);
-        const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        local.push(item);
-        if (local.length >= 3) break;
-      }
-      if (local.length === 0) {
-        for (const item of ranked) {
-          const v = item.volumeInfo;
-          const isbn = getIsbn(item);
-          const key = isbn || `${normPub(v.publisher)}_${v.pageCount || 0}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          local.push(item);
-          if (local.length >= 3) break;
-        }
-      }
-
-      currentResults = local;
-      applyResult(0);
-    } catch (e) {
-      console.error(e);
-      statusEl.textContent = 'Search failed. Please try again later.';
-      statusEl.className = 'autofill-status error';
-    } finally {
-      btn.disabled = false;
-      autofillInProgress = false;
-    }
   }
 
   // Color picker — persist via localStorage
@@ -949,21 +776,15 @@
 
   document.getElementById('form').addEventListener('input', render);
   document.getElementById('form').addEventListener('change', render);
-  document.getElementById('autofill').addEventListener('click', autofillFromTitle);
-  document.getElementById('title').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      autofillFromTitle();
-    }
-  });
   document.getElementById('download').addEventListener('click', () => {
-    const { title } = readForm();
-    const stype = getStatType();
+    const stat = getStat();
+    const style = getStyle();
+    const today = new Date().toISOString().slice(0, 10);
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `growbooklog_${slugify(title)}_${stype}.png`;
+      a.download = `growbooklog_${today}_${stat}_${style}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
