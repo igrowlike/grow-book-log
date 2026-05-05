@@ -56,10 +56,50 @@
     .layout { grid-template-columns: 1fr; }
   }
   .form-card {
+    background: transparent;
+    padding: 0;
+  }
+  .section {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .color-picker {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .color-swatch {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+    box-shadow: 0 0 0 2px transparent;
+    transition: box-shadow 0.15s, transform 0.05s;
+  }
+  .color-swatch:hover { transform: scale(1.06); }
+  .color-swatch.active {
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px #ffffff;
+  }
+  .seg label {
+    border-radius: 999px;
+    padding: 10px 0;
+  }
+  .seg input:checked + span,
+  .seg label:has(input:checked) {
+    border-radius: 999px;
   }
   .field { margin-bottom: 16px; }
   .field label {
@@ -261,73 +301,80 @@
 
   <div class="layout">
     <form class="form-card" id="form" autocomplete="off">
-      <div class="field">
-        <label>지표 종류</label>
-        <div class="seg">
-          <label>
-            <input type="radio" name="layout" value="progress" checked />
-            Progress형
-          </label>
-          <label>
-            <input type="radio" name="layout" value="pace" />
-            Pace형
-          </label>
-        </div>
-      </div>
-      <div class="field">
-        <label>배경</label>
-        <div class="seg">
-          <label>
-            <input type="radio" name="bg" value="transparent" checked />
-            투명
-          </label>
-          <label>
-            <input type="radio" name="bg" value="dark" />
-            검정
-          </label>
-        </div>
-      </div>
-      <div class="field">
-        <label for="title">책 제목</label>
-        <div class="title-row">
-          <input type="text" id="title" required />
-          <button type="button" id="autofill" class="autofill-btn">자동 채우기</button>
-        </div>
-        <div class="autofill-status" id="autofillStatus"></div>
-        <div class="result-chips" id="resultChips"></div>
-      </div>
-      <div class="field">
-        <label for="author">저자</label>
-        <input type="text" id="author" />
-      </div>
-      <div class="field">
-        <label for="total">총 페이지 수</label>
-        <input type="number" id="total" min="1" required />
-      </div>
-      <div class="row">
+      <div class="section">
+        <div class="section-title">스타일</div>
         <div class="field">
-          <label for="todayStart">오늘 시작 페이지</label>
-          <input type="number" id="todayStart" min="1" required />
+          <label>지표 종류</label>
+          <div class="seg">
+            <label>
+              <input type="radio" name="layout" value="progress" checked />
+              Progress형
+            </label>
+            <label>
+              <input type="radio" name="layout" value="pace" />
+              Pace형
+            </label>
+          </div>
         </div>
         <div class="field">
-          <label for="todayEnd">오늘 끝 페이지</label>
-          <input type="number" id="todayEnd" min="1" required />
+          <label>액센트 색</label>
+          <div class="color-picker" id="colorPicker">
+            <button type="button" class="color-swatch active" data-color="#39FF14" style="background:#39FF14" aria-label="네온 그린"></button>
+            <button type="button" class="color-swatch" data-color="#FC4C02" style="background:#FC4C02" aria-label="스트라바 오렌지"></button>
+            <button type="button" class="color-swatch" data-color="#2979FF" style="background:#2979FF" aria-label="블루"></button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom: 0;">
+          <label>배경</label>
+          <div class="seg">
+            <label>
+              <input type="radio" name="bg" value="transparent" checked />
+              투명
+            </label>
+            <label>
+              <input type="radio" name="bg" value="dark" />
+              검정
+            </label>
+          </div>
         </div>
       </div>
-      <div class="row">
+
+      <div class="section">
+        <div class="section-title">책 정보</div>
         <div class="field">
+          <label for="title">책 제목</label>
+          <div class="title-row">
+            <input type="text" id="title" required />
+            <button type="button" id="autofill" class="autofill-btn">자동 채우기</button>
+          </div>
+          <div class="autofill-status" id="autofillStatus"></div>
+          <div class="result-chips" id="resultChips"></div>
+        </div>
+        <div class="field">
+          <label for="author">저자</label>
+          <input type="text" id="author" />
+        </div>
+        <div class="field" style="margin-bottom: 0;">
+          <label for="total">총 페이지 수</label>
+          <input type="number" id="total" min="1" required />
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">오늘 읽은 양</div>
+        <div class="row">
+          <div class="field">
+            <label for="todayStart">오늘 시작 페이지</label>
+            <input type="number" id="todayStart" min="1" required />
+          </div>
+          <div class="field">
+            <label for="todayEnd">오늘 끝 페이지</label>
+            <input type="number" id="todayEnd" min="1" required />
+          </div>
+        </div>
+        <div class="field" style="margin-bottom: 0;">
           <label for="time">읽은 시간 (분)</label>
           <input type="number" id="time" min="0" required />
-        </div>
-        <div class="field">
-          <label for="date">날짜</label>
-          <div class="date-row">
-            <input type="date" id="date" required />
-            <div class="date-stepper">
-              <button type="button" id="dateUp" aria-label="다음 날">▲</button>
-              <button type="button" id="dateDown" aria-label="이전 날">▼</button>
-            </div>
-          </div>
         </div>
       </div>
     </form>
@@ -387,13 +434,56 @@
     return COLOR.VERY_DIM;
   }
 
+  function drawBookIcon(cx, cy, color, lineWidth = 6) {
+    // Open book outline: two pages with peaked tops, slight bottom curve, center spine.
+    const bw = 360, bh = 240;
+    const xL = cx - bw / 2, xR = cx + bw / 2;
+    const yT = cy - bh / 2, yB = cy + bh / 2;
+    const spineTopY = yT + bh * 0.30;
+    const spineBotY = yB - 4;
+
+    const points = [
+      [cx, spineBotY],            // spine bottom
+      [xL + 18, yB - 14],         // bottom left
+      [xL + 6, yT + 6],           // top left peak
+      [cx, spineTopY],            // spine top dip
+      [xR - 6, yT + 6],           // top right peak
+      [xR - 18, yB - 14],         // bottom right
+    ];
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Outline
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i][0], points[i][1]);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Spine line
+    ctx.beginPath();
+    ctx.moveTo(cx, spineTopY);
+    ctx.lineTo(cx, spineBotY);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   function setupCanvas() {
     const { W, H } = CANVAS;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
+    // Target export = 1080 x 1920 (Strava/iPhone share size)
+    const TARGET_W = 1080;
+    const scale = TARGET_W / W;  // ~1.374
+    canvas.width = Math.round(W * scale);   // 1080
+    canvas.height = Math.round(H * scale);  // 1920
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
+    ctx.scale(scale, scale);
     return { W, H };
   }
 
@@ -454,14 +544,6 @@
     ctx.stroke();
   }
 
-  function drawBrandMark(cx, cy, scale = 1) {
-    setFont(900, 32 * scale);
-    ctx.fillStyle = COLOR.ACCENT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('GROW', cx, cy);
-  }
-
   function readForm() {
     const title = (document.getElementById('title').value || '').trim();
     const author = (document.getElementById('author').value || '').trim();
@@ -473,9 +555,7 @@
       if (total > 0) todayEnd = Math.min(total, todayEnd);
     }
     const time = Math.max(0, parseInt(document.getElementById('time').value, 10) || 0);
-    const dateStr = document.getElementById('date').value;
-    const date = dateStr ? dateStr.replace(/-/g, '.') : '';
-    return { title, author, total, todayStart, todayEnd, time, date };
+    return { title, author, total, todayStart, todayEnd, time };
   }
 
   function parseValue(value) {
@@ -522,7 +602,7 @@
   }
 
   function renderCard(W, H, data) {
-    const { title, author, todayStart, todayEnd, time, date } = data;
+    const { title, author, todayStart, todayEnd, time } = data;
     const pages = Math.max(0, todayEnd - todayStart);
 
     fillBackground(W, H);
@@ -530,25 +610,18 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Date as small "eyebrow" above title
-    if (date) {
-      ctx.fillStyle = COLOR.FG;
-      setFont(700, 22);
-      ctx.fillText(date, W / 2, 85);
-    }
-
     // Title (only if entered)
     if (title) {
       ctx.fillStyle = COLOR.FG;
       setFont(900, 44);
-      ctx.fillText(title, W / 2, 140);
+      ctx.fillText(title, W / 2, 130);
     }
 
-    // Author alone (no date attached)
+    // Author
     if (author) {
       ctx.fillStyle = COLOR.FG;
       setFont(700, 24);
-      ctx.fillText(author, W / 2, 195);
+      ctx.fillText(author, W / 2, 185);
     }
 
     const stats = [
@@ -569,15 +642,19 @@
       drawDualSizeValue(W / 2, rowY + 96, num, unit, NUM_SIZE, UNIT_SIZE);
     });
 
-    drawSquareSpiral({
-      cx: W / 2, cy: 1050,
-      rMax: 160, rMin: 16,
-      todayEnd, total: data.total,
-      color: COLOR.ACCENT,
-      todayWidth: 7,
-    });
-
-    drawBrandMark(W / 2, 1340, 1.1);
+    if (getStatType() === 'pace') {
+      // Pace mode → empty open book outline
+      drawBookIcon(W / 2, 1100, COLOR.ACCENT, 6);
+    } else {
+      // Progress mode → square spiral with progress fill
+      drawSquareSpiral({
+        cx: W / 2, cy: 1100,
+        rMax: 160, rMin: 16,
+        todayEnd, total: data.total,
+        color: COLOR.ACCENT,
+        todayWidth: 7,
+      });
+    }
   }
 
   function render() {
@@ -587,14 +664,6 @@
       'transparent', getBgMode() !== 'dark'
     );
     renderCard(W, H, data);
-  }
-
-  function setDefaultDate() {
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
-    const d = String(today.getDate()).padStart(2, '0');
-    document.getElementById('date').value = `${y}-${m}-${d}`;
   }
 
   function slugify(s) {
@@ -782,26 +851,28 @@
     }
   }
 
-  function shiftDate(days) {
-    const dateEl = document.getElementById('date');
-    const today = new Date();
-    const t = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    const current = dateEl.value || t;
-    const d = new Date(current + 'T00:00:00');
-    d.setDate(d.getDate() + days);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    dateEl.value = `${y}-${m}-${day}`;
+  // Color picker — persist via localStorage
+  function applyAccent(hex) {
+    COLOR.ACCENT = hex;
+    document.documentElement.style.setProperty('--accent', hex);
+    document.querySelectorAll('.color-swatch').forEach((b) => {
+      b.classList.toggle('active', b.dataset.color.toUpperCase() === hex.toUpperCase());
+    });
     render();
   }
+  const savedColor = localStorage.getItem('gbl_accent') || '#39FF14';
+  applyAccent(savedColor);
+  document.querySelectorAll('.color-swatch').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const c = btn.dataset.color;
+      localStorage.setItem('gbl_accent', c);
+      applyAccent(c);
+    });
+  });
 
-  setDefaultDate();
   document.getElementById('form').addEventListener('input', render);
   document.getElementById('form').addEventListener('change', render);
   document.getElementById('autofill').addEventListener('click', autofillFromTitle);
-  document.getElementById('dateUp').addEventListener('click', () => shiftDate(1));
-  document.getElementById('dateDown').addEventListener('click', () => shiftDate(-1));
   document.getElementById('title').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -809,13 +880,13 @@
     }
   });
   document.getElementById('download').addEventListener('click', () => {
-    const { title, date } = readForm();
+    const { title } = readForm();
     const stype = getStatType();
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `growbooklog_${slugify(title)}_${date || 'today'}_${stype}.png`;
+      a.download = `growbooklog_${slugify(title)}_${stype}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
