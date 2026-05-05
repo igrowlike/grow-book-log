@@ -358,8 +358,8 @@
               Sketch
             </label>
             <label>
-              <input type="radio" name="style" value="pace" />
-              Pace
+              <input type="radio" name="style" value="book" />
+              Book
             </label>
             <label>
               <input type="radio" name="style" value="stats" />
@@ -727,7 +727,7 @@
       : (data.total > 0 ? Math.min(1, todayEnd / data.total) : 0);
 
     const style = getStyle();
-    if (style === 'pace') {
+    if (style === 'book') {
       drawBookIcon(W / 2, 1050, COLOR.ACCENT, 6, fraction);
     } else if (style === 'sketch') {
       drawSketchBook(W / 2, 1050, COLOR.ACCENT, fraction);
