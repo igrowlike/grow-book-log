@@ -691,6 +691,8 @@
     });
   }
 
+  const GBOOKS_KEY = 'AIzaSyDKls2NUN2wBuWV16tInDGvhVOx2t65PnU';
+
   function getIsbn(item) {
     const ids = item.volumeInfo.industryIdentifiers || [];
     const isbn13 = ids.find(x => x.type === 'ISBN_13');
@@ -723,7 +725,7 @@
     statusEl.className = 'autofill-status';
 
     try {
-      const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=20`;
+      const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(title)}&maxResults=20&key=${GBOOKS_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
 
