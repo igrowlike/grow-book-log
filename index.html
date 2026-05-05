@@ -709,16 +709,18 @@
     // Always reset to white before stats (so they show even when title/author empty)
     ctx.fillStyle = COLOR.FG;
 
-    const baseY = 200;
-    const rowGap = 192;
-    const NUM_SIZE = 104;
-    const UNIT_SIZE = 73; // 70% of NUM_SIZE
+    const baseY = 175;
+    const rowGap = 200;
+    const LABEL_TO_VALUE = 90;
+    const NUM_SIZE = 118;
+    const UNIT_SIZE = 118;
+    const LABEL_SIZE = 38;
     stats.forEach(([label, value], i) => {
       const rowY = baseY + i * rowGap;
-      setFont(700, 30);
+      setFont(700, LABEL_SIZE);
       ctx.fillText(label, W / 2, rowY);
       const { num, unit } = parseValue(value);
-      drawDualSizeValue(W / 2, rowY + 96, num, unit, NUM_SIZE, UNIT_SIZE);
+      drawDualSizeValue(W / 2, rowY + LABEL_TO_VALUE, num, unit, NUM_SIZE, UNIT_SIZE);
     });
 
     // Fill fraction: Pace mode → always 100%, Progress mode → todayEnd/total
@@ -728,12 +730,12 @@
 
     const style = getStyle();
     if (style === 'book') {
-      drawBookIcon(W / 2, 1050, COLOR.ACCENT, 6, fraction);
+      drawBookIcon(W / 2, 950, COLOR.ACCENT, 6, fraction);
     } else if (style === 'sketch') {
-      drawSketchBook(W / 2, 1050, COLOR.ACCENT, fraction);
+      drawSketchBook(W / 2, 950, COLOR.ACCENT, fraction);
     } else {
       drawSquareSpiral({
-        cx: W / 2, cy: 1050,
+        cx: W / 2, cy: 950,
         rMax: 160, rMin: 16,
         fraction,
         color: COLOR.ACCENT,
