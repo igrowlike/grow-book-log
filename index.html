@@ -73,6 +73,7 @@
     align-items: start;
     justify-content: center;
   }
+  .strip { display: none; }
   @media (max-width: 820px) {
     .layout {
       display: flex;
@@ -80,23 +81,77 @@
       max-width: 420px;
       margin: 0 auto;
     }
-    .preview {
-      order: -1;
+    .layout .preview { display: none !important; }
+    .strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       position: sticky;
       top: 0;
       z-index: 10;
-      background: var(--bg);
-      padding: 10px 0 12px;
-      margin-bottom: 4px;
+      width: 100%;
+      box-sizing: border-box;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      order: -1;
     }
-    .preview canvas {
-      max-width: 180px;
+    .strip-thumb {
+      width: 56px;
+      height: 56px;
+      background: #0c0c0c;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
     }
-    .download {
-      max-width: 180px;
-      margin-top: 10px;
-      padding: 10px 20px;
+    .strip-thumb-sketch {
+      width: 100%;
+      height: 100%;
+      background-color: var(--accent);
+      -webkit-mask: url('book-sketch.png') center/90% no-repeat;
+              mask: url('book-sketch.png') center/90% no-repeat;
+    }
+    .strip-info {
+      flex: 1;
+      min-width: 0;
+      line-height: 1.15;
+    }
+    .strip-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .strip-stats {
+      color: var(--text);
       font-size: 13px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+    .strip-pace {
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 900;
+      margin-top: 1px;
+    }
+    .strip-btn {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      letter-spacing: 0.02em;
     }
   }
   .form-card {
@@ -357,6 +412,19 @@
   </header>
 
   <div class="layout">
+    <div class="strip" id="strip" role="region" aria-label="reading summary">
+      <div class="strip-thumb">
+        <svg viewBox="0 0 60 50" width="40" height="34" fill="none" id="stripSvg" aria-hidden="true">
+          <path d="M30 46 L8 42 L8 8 L30 14 L52 8 L52 42 L30 46 Z M30 14 L30 46" stroke="#FC4C02" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="strip-info">
+        <div class="strip-label">Today</div>
+        <div class="strip-stats" id="stripStats">0 pages · 0m</div>
+        <div class="strip-pace" id="stripPace">0.0 p/m</div>
+      </div>
+      <button type="button" class="strip-btn" id="stripDownload">PNG ↓</button>
+    </div>
     <form class="form-card" id="form" autocomplete="off">
       <div class="section">
         <div class="section-title">Style</div>
@@ -692,28 +760,29 @@
   }
 
   function drawDualSizeValue(centerX, midY, num, unit, numSize, unitSize) {
-    if (!unit) {
-      setFont(900, numSize);
-      ctx.textAlign = 'center';
-      ctx.fillText(num, centerX, midY);
-      return;
-    }
     setFont(900, numSize);
     const numM = ctx.measureText(num);
     const numW = numM.width;
+    const baselineY = midY + (numM.actualBoundingBoxAscent - numM.actualBoundingBoxDescent) / 2;
+
+    const prevBaseline = ctx.textBaseline;
+    ctx.textBaseline = 'alphabetic';
+
+    if (!unit) {
+      ctx.textAlign = 'center';
+      ctx.fillText(num, centerX, baselineY);
+      ctx.textBaseline = prevBaseline;
+      return;
+    }
+
     setFont(900, unitSize);
     const unitW = ctx.measureText(unit).width;
     const gap = 4;
     const totalW = numW + gap + unitW;
     const startX = centerX - totalW / 2;
 
-    setFont(900, numSize);
-    const m = ctx.measureText(num);
-    const baselineY = midY + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-
-    const prevBaseline = ctx.textBaseline;
-    ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
+    setFont(900, numSize);
     ctx.fillText(num, startX, baselineY);
     setFont(900, unitSize);
     ctx.fillText(unit, startX + numW + gap, baselineY);
@@ -751,9 +820,9 @@
     // Always reset to white before stats (so they show even when title/author empty)
     ctx.fillStyle = COLOR.FG;
 
-    const baseY = 175;
-    const rowGap = 200;
-    const LABEL_TO_VALUE = 90;
+    const baseY = 165;
+    const rowGap = 230;
+    const LABEL_TO_VALUE = 125;
     const NUM_SIZE = 118;
     const UNIT_SIZE = 118;
     const LABEL_SIZE = 38;
@@ -797,6 +866,26 @@
     }
   }
 
+  function updateStrip(data) {
+    const pages = Math.max(0, data.todayEnd - data.todayStart);
+    document.getElementById('stripStats').textContent = `${pages} pages · ${data.time}m`;
+    const [, paceVal] = calcThirdStat(data);
+    document.getElementById('stripPace').textContent =
+      paceVal.replace('p/m', ' p/m');
+
+    const thumb = document.querySelector('.strip-thumb');
+    if (!thumb) return;
+    const style = getStyle();
+    const c = COLOR.ACCENT;
+    if (style === 'sketch') {
+      thumb.innerHTML = '<div class="strip-thumb-sketch"></div>';
+    } else if (style === 'stats') {
+      thumb.innerHTML = `<svg viewBox="0 0 60 50" width="44" height="36" fill="none" id="stripSvg"><path d="M52 25 L52 6 L8 6 L8 44 L46 44 L46 14 L18 14 L18 38 L36 38 L36 22 L26 22 L26 30" stroke="${c}" stroke-width="2.5" fill="none" stroke-linejoin="miter"/></svg>`;
+    } else {
+      thumb.innerHTML = `<svg viewBox="0 0 60 50" width="44" height="36" fill="none" id="stripSvg"><path d="M30 46 L8 42 L8 8 L30 14 L52 8 L52 42 L30 46 Z M30 14 L30 46" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/></svg>`;
+    }
+  }
+
   function render() {
     const { W, H } = setupCanvas();
     const data = readForm();
@@ -804,6 +893,7 @@
       'transparent', getBgMode() !== 'dark'
     );
     renderCard(W, H, data);
+    updateStrip(data);
   }
 
   function slugify(s) {
@@ -831,6 +921,9 @@
 
   document.getElementById('form').addEventListener('input', render);
   document.getElementById('form').addEventListener('change', render);
+  document.getElementById('stripDownload').addEventListener('click', () => {
+    document.getElementById('download').click();
+  });
   document.getElementById('download').addEventListener('click', () => {
     const stat = getStat();
     const style = getStyle();
