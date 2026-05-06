@@ -97,6 +97,10 @@
       padding: 8px 12px;
       margin-bottom: 12px;
       order: -1;
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
     }
     .strip-thumb {
       width: 56px;
@@ -866,6 +870,8 @@
     }
   }
 
+  let _lastStripStyle = null;
+  let _lastStripAccent = null;
   function updateStrip(data) {
     const pages = Math.max(0, data.todayEnd - data.todayStart);
     document.getElementById('stripStats').textContent = `${pages} pages · ${data.time}m`;
@@ -877,6 +883,9 @@
     if (!thumb) return;
     const style = getStyle();
     const c = COLOR.ACCENT;
+    if (style === _lastStripStyle && c === _lastStripAccent) return;
+    _lastStripStyle = style;
+    _lastStripAccent = c;
     if (style === 'sketch') {
       thumb.innerHTML = '<div class="strip-thumb-sketch"></div>';
     } else if (style === 'stats') {
