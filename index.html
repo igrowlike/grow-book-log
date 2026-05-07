@@ -80,27 +80,26 @@
       flex-direction: column;
       max-width: 420px;
       margin: 0 auto;
+      padding-bottom: 90px;
     }
     .layout .preview { display: none !important; }
     .strip {
       display: flex;
       align-items: center;
       gap: 12px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      width: 100%;
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+      transform: translateX(-50%);
+      z-index: 100;
+      width: calc(100vw - 32px);
+      max-width: 400px;
       box-sizing: border-box;
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 8px 12px;
-      margin-bottom: 12px;
-      order: -1;
-      transform: translate3d(0, 0, 0);
-      will-change: transform;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
     .strip-thumb {
       width: 56px;
@@ -157,12 +156,6 @@
       flex-shrink: 0;
       letter-spacing: 0.02em;
     }
-    .field input[type="text"],
-    .field input[type="number"],
-    .field input[type="date"] {
-      scroll-margin-top: 100px;
-    }
-    .strip.input-focused { display: none !important; }
   }
   .form-card {
     background: transparent;
@@ -938,15 +931,6 @@
   document.getElementById('form').addEventListener('change', render);
   document.getElementById('stripDownload').addEventListener('click', () => {
     document.getElementById('download').click();
-  });
-
-  // Hide sticky strip while any input is focused (mobile only via CSS)
-  const stripEl = document.getElementById('strip');
-  document.getElementById('form').addEventListener('focusin', (e) => {
-    if (e.target.matches('input')) stripEl.classList.add('input-focused');
-  });
-  document.getElementById('form').addEventListener('focusout', (e) => {
-    if (e.target.matches('input')) stripEl.classList.remove('input-focused');
   });
   document.getElementById('download').addEventListener('click', () => {
     const stat = getStat();
