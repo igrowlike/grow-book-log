@@ -162,6 +162,7 @@
     .field input[type="date"] {
       scroll-margin-top: 100px;
     }
+    .strip.input-focused { display: none !important; }
   }
   .form-card {
     background: transparent;
@@ -937,6 +938,15 @@
   document.getElementById('form').addEventListener('change', render);
   document.getElementById('stripDownload').addEventListener('click', () => {
     document.getElementById('download').click();
+  });
+
+  // Hide sticky strip while any input is focused (mobile only via CSS)
+  const stripEl = document.getElementById('strip');
+  document.getElementById('form').addEventListener('focusin', (e) => {
+    if (e.target.matches('input')) stripEl.classList.add('input-focused');
+  });
+  document.getElementById('form').addEventListener('focusout', (e) => {
+    if (e.target.matches('input')) stripEl.classList.remove('input-focused');
   });
   document.getElementById('download').addEventListener('click', () => {
     const stat = getStat();
